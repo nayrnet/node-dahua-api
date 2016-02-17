@@ -6,6 +6,8 @@
 
 NodeJS Module for communication with Dahua IP Cameras..
 
+## Status: Work in Progress
+
 ## Example:
 ```javascript
 #!/usr/bin/nodejs
@@ -13,7 +15,7 @@ var     ipcamera	= require('node-dahua-api');
 
 // Options:
 var westPTZoptions = {
-        host 	: 'west-ptz',
+	host	: 'west-ptz',
 	port 	: '80',
 	user 	: 'ptz',
 	pass 	: 'ptz',
