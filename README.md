@@ -31,8 +31,20 @@ westPTZ.on('alarm', function(data) {
 
 ## Functions:
 ```javascript
+// Switch Camera to Night Profile
+dahua.dayProfile()
+
+// Switch Camera to Night Profile
+dahua.nightProfile()
+
+// Issue Dahua PTZ Command
+dahua.ptzCommand(cmd,arg1,arg2,arg3,arg4)
+
 // Callback for any Alarm (Motion Detection/Video Loss/Alarm Inputs)
 dahua.on('alarm', function(data){  });
+
+// Callback for PTZ Status
+dahua.on('ptzStatus', function(data){  });
 
 // Callback on connect
 dahua.on('connect', function(){  });
