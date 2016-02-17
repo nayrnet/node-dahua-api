@@ -17,8 +17,8 @@ var     ipcamera	= require('node-dahua-api');
 var westPTZoptions = {
 	host	: 'west-ptz',
 	port 	: '80',
-	user 	: 'ptz',
-	pass 	: 'ptz',
+	user 	: 'admin',
+	pass 	: 'password123',
 	log 	: false,
 };
 
@@ -32,7 +32,7 @@ westPTZ.on('alarm', function(data) {
 ## Functions:
 ```javascript
 // Callback for any Alarm (Motion Detection/Video Loss/Alarm Inputs)
-dahua.on('alarm', function(alarm){  });
+dahua.on('alarm', function(data){  });
 
 // Callback on connect
 dahua.on('connect', function(){  });
