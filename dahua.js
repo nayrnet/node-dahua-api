@@ -48,10 +48,54 @@ dahua.prototype.ptzCommand = function (cmd,arg1,arg2,arg3,arg4) {
     	var self = this;
 	if ((!cmd) || (isNaN(arg1)) || (isNaN(arg2)) || (isNaN(arg3)) || (isNaN(arg4))) {
 		handleError(self,'INVALID PTZ COMMAND')
+		return 0
 	}
 	request(BASEURI + '/cgi-bin/ptz.cgi?action=start&channel=0&code=' + ptzcommand + '&arg1=' + arg1 + '&arg2=' + arg2 + '&arg3=' + arg3 + '&arg4=' + arg4, function (error, response, body) {
-		if ((error) || (response.statusCode !== 200)) {
-			self.emit("error", 'FAILED TO SEND PTZ COMMAND');
+		if ((error) || (response.statusCode !== 200) || (body.trim() !== "OK")) {
+			self.emit("error", 'FAILED TO ISSUE PTZ COMMAND');
+		}
+	})
+}
+
+dahua.prototype.ptzPreset = function (preset) {
+    	var self = this;
+	if (isNaN(preset))	handleError(self,'INVALID PTZ PRESET');
+	request(BASEURI + '/cgi-bin/ptz.cgi?action=start&channel=0&code=GotoPreset&arg1=0&arg2=' + preset + '&arg3=0', function (error, response, body) {
+		if ((error) || (response.statusCode !== 200) || (body.trim() !== "OK")) {
+			self.emit("error", 'FAILED TO ISSUE PTZ PRESET');
+		}
+	})
+}
+
+dahua.prototype.ptzZoom = function (multiple) {
+    	var self = this;
+	if (isNaN(multiple))	handleError(self,'INVALID PTZ ZOOM');
+	if (multiple > 0)	cmd = 'ZoomTele';
+	if (multiple < 0)	cmd = 'ZoomWide';
+	if (multiple === 0)	return 0;
+
+	request(BASEURI + '/cgi-bin/ptz.cgi?action=start&channel=0&code=' + cmd + '&arg1=0&arg2=' + multiple + '&arg3=0', function (error, response, body) {
+		if ((error) || (response.statusCode !== 200) || (body.trim() !== "OK")) {
+			self.emit("error", 'FAILED TO ISSUE PTZ ZOOM');
+		}
+	})
+}
+
+dahua.prototype.ptzMove = function (direction,action,speed) {
+    	var self = this;
+	if (isNaN(speed))	handleError(self,'INVALID PTZ SPEED');
+	if ((action !== 'start') || (action !== 'stop')) {
+		handleError(self,'INVALID PTZ COMMAND')
+		return 0
+	}
+	if ((direction !== 'Up') || (direction !== 'Down') || (direction !== 'Left') || (direction !== 'Right') 
+	    (direction !== 'LeftUp') || (direction !== 'RightUp') || (direction !== 'LeftDown') || (direction !== 'RightDown')) {
+		handleError(self,'INVALID PTZ DIRECTION')
+		return 0
+	}
+	request(BASEURI + '/cgi-bin/ptz.cgi?action=' + action + '&channel=0&code=' + direction + '&arg1=' + speed +'&arg2=' + speed + '&arg3=0', function (error, response, body) {
+		if ((error) || (response.statusCode !== 200) || (body.trim() !== "OK")) {
+			self.emit("error", 'FAILED TO ISSUE PTZ UP COMMAND');
 		}
 	})
 }
@@ -69,6 +113,7 @@ dahua.prototype.ptzStatus = function () {
 }
 
 dahua.prototype.dayProfile = function () {
+    	var self = this;
 	request(BASEURI + '/cgi-bin/configManager.cgi?action=setConfig&VideoInMode[0].Config[0]=1', function (error, response, body) {
 		if ((!error) && (response.statusCode === 200)) {
 			if (body === 'Error') {		// Didnt work, lets try another method for older cameras
@@ -85,6 +130,7 @@ dahua.prototype.dayProfile = function () {
 }
 
 dahua.prototype.nightProfile = function () {
+    	var self = this;
 	request(BASEURI + '/cgi-bin/configManager.cgi?action=setConfig&VideoInMode[0].Config[0]=2', function (error, response, body) {
 		if ((!error) && (response.statusCode === 200)) {
 			if (body === 'Error') {		// Didnt work, lets try another method for older cameras
@@ -106,8 +152,11 @@ function handleData(self, data) {
 	var i = Object.keys(data);
 	i.forEach(function(id){
 		if (data[id].startsWith('Code=')) {
-			alarm = data[id].split(';')
-			self.emit("alarm", alarm);
+			var	alarm = data[id].split(';')
+			var	code = alarm[0].substr(5)
+			var	action = alarm[1].substr(7)
+			var	index = alarm[2].substr(6)
+			self.emit("alarm", code,action,index);
 		}
 	});
 }
