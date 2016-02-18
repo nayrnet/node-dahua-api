@@ -40,6 +40,9 @@ dahua.nightProfile()
 // Issue Dahua PTZ Command
 dahua.ptzCommand(cmd,arg1,arg2,arg3,arg4)
 
+// Request current PTZ Status
+dahua.ptzStatus()
+
 // Callback for any Alarm (Motion Detection/Video Loss/Alarm Inputs)
 dahua.on('alarm', function(data){  });
 
@@ -60,6 +63,9 @@ dahua.on('error', function(error){  });
 * user - username for camera
 * pass - password for camera
 * log - boolean to show detailed logs, defaults to false.
+
+## More Info:
+* Support & Discussion: https://www.ipcamtalk.com/showthread.php/9004-NodeJS-Module-node-dahua-api?p=80111
 
 ## About:
 By: Ryan Hunt
