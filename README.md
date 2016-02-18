@@ -37,14 +37,26 @@ dahua.dayProfile()
 // Switch Camera to Night Profile
 dahua.nightProfile()
 
-// Issue Dahua PTZ Command
+// Issue Dahua RAW PTZ Command (See API Manual in GitHub Wiki)
 dahua.ptzCommand(cmd,arg1,arg2,arg3,arg4)
+
+// Go To Preset
+dahua.ptzPreset(int)
+
+// PTZ Zoom, input level: positive = zoom in / negative = zoom out
+dahua.ptzZoom(float)
+
+// PTZ Move
+// Directions = Up/Down/Left/Right/LeftUp/RightUp/LeftDown/RightDown
+// Actions = start/stop
+// Speed = 1-8
+dahua.ptzMove(direction,action,speed)
 
 // Request current PTZ Status
 dahua.ptzStatus()
 
-// Callback for any Alarm (Motion Detection/Video Loss/Alarm Inputs)
-dahua.on('alarm', function(data){  });
+// Callback for any Alarm (Motion Detection/Video Loss & Blank/Alarm Inputs)
+dahua.on('alarm', function(code,action,index){  });
 
 // Callback for PTZ Status
 dahua.on('ptzStatus', function(data){  });
