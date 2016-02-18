@@ -14,18 +14,32 @@ NodeJS Module for communication with Dahua IP Cameras..
 var     ipcamera	= require('node-dahua-api');
 
 // Options:
-var westPTZoptions = {
-	host	: 'west-ptz',
+var options = {
+	host	: '192.168.1.100',
 	port 	: '80',
 	user 	: 'admin',
 	pass 	: 'password123',
 	log 	: false,
 };
 
-var westPTZ 	= new ipcamera.dahua(westPTZoptions);
+var dahua 	= new ipcamera.dahua(options);
 
-westPTZ.on('alarm', function(data) {
-	console.log(data.toString())
+// Switch to Day Profile
+dahua.nightProfile()
+
+// PTZ Go to preset 10
+dahua.ptzPreset(10)
+
+// Monitor Camera Alarms
+dahua.on('alarm', function(code,action,index) {
+	if (code === 'VideoMotion' && action === 'Start')	console.log('Video Motion Detected')
+	if (code === 'VideoMotion' && action === 'Stop')	console.log('Video Motion Ended')
+	if (code === 'AlarmLocal' && action === 'Start')	console.log('Local Alarm Triggered: ' + index)
+	if (code === 'AlarmLocal' && action === 'Stop')		console.log('Local Alarm Ended: ' + index)
+	if (code === 'VideoLoss' && action === 'Start')		console.log('Video Lost!')
+	if (code === 'VideoLoss' && action === 'Stop')		console.log('Video Found!')
+	if (code === 'VideoBlind' && action === 'Start')	console.log('Video Blind!')
+	if (code === 'VideoBlind' && action === 'Stop')		console.log('Video Unblind!')
 });
 ```
 

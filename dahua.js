@@ -23,7 +23,7 @@ dahua.prototype.connect = function(options) {
 	var authHeader = 'Basic ' + new Buffer(options.user + ':' + options.pass).toString('base64');
 	// Connect
 	var client = net.connect(options, function () {
-		client.write(	'GET /cgi-bin/eventManager.cgi?action=attach&codes=[AlarmLocal,VideoMotion,VideoLoss] HTTP/1.0\r\n' +
+		client.write(	'GET /cgi-bin/eventManager.cgi?action=attach&codes=[AlarmLocal,VideoMotion,VideoLoss,VideoBlind] HTTP/1.0\r\n' +
 				'Host: ' + options.host + ':' + options.port + '\r\n' +
 				authHeader + '\r\n' + 
 				'Accept: multipart/x-mixed-replace\r\n' + 
