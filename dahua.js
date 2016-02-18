@@ -35,7 +35,8 @@ dahua.prototype.connect = function(options) {
        		handleData(self, data)
 	});
 
-	client.on('close', function() {
+	client.on('close', function() {		// Try to reconnect after 30s
+	        setTimeout(function() { self.connect(options) }, 30000 );
 		handleEnd(self)
 	});
 
@@ -169,7 +170,6 @@ function handleConnection(self) {
 
 function handleEnd(self) {
 	if (TRACE)	console.log("Connection closed!");
-        setTimeout(function() { receiver.connect(options) }, 30000 );
 	self.emit("end");
 }
 
