@@ -5,6 +5,7 @@ var 	net 		= require('net');
 var  	events 		= require('events');
 var 	util		= require('util');
 var 	request 	= require('request');
+var	NetKeepAlive 	= require('net-keepalive');
 
 var	TRACE		= true;
 var	BASEURI		= false;
@@ -21,14 +22,24 @@ util.inherits(dahua, events.EventEmitter);
 dahua.prototype.connect = function(options) {
 	var self = this
 	var authHeader = 'Basic ' + new Buffer(options.user + ':' + options.pass).toString('base64');
+
 	// Connect
 	var client = net.connect(options, function () {
-		client.write(	'GET /cgi-bin/eventManager.cgi?action=attach&codes=[AlarmLocal,VideoMotion,VideoLoss,VideoBlind] HTTP/1.0\r\n' +
+		var header =	'GET /cgi-bin/eventManager.cgi?action=attach&codes=[AlarmLocal,VideoMotion,VideoLoss,VideoBlind] HTTP/1.0\r\n' +
 				'Host: ' + options.host + ':' + options.port + '\r\n' +
 				authHeader + '\r\n' + 
-				'Accept: multipart/x-mixed-replace\r\n' + 
-				'Connection: Keep-Alive\r\n\r\n');
+				'Accept: multipart/x-mixed-replace\r\n\r\n';
+		client.write(header)
+		client.setKeepAlive(true,1000)
+		NetKeepAlive.setKeepAliveInterval(client,5000)	// sets TCP_KEEPINTVL to 5s
+		NetKeepAlive.setKeepAliveProbes(client, 12)	// 60s and kill the connection.
         	handleConnection(self);
+	});
+
+	client.on('timeout', function() {
+		console.log("10 mins of inactivity")
+		//self.abort()
+		//self.connect(options)
 	});
 
 	client.on('data', function(data) {
