@@ -7,21 +7,24 @@ var 	util		= require('util');
 var 	request 	= require('request');
 var	NetKeepAlive 	= require('net-keepalive');
 
-var	TRACE		= true;
+// Define Globals
+var	TRACE		= false;
 var	BASEURI		= false;
 
+// Module Loader
 var dahua = function(options) {
 	events.EventEmitter.call(this)
 	this.client = this.connect(options)
-	TRACE = options.log
-	BASEURI = 'http://' + options.user + ':' + options.pass + '@' + options.host + ':' + options.port
+	if (options.log)	TRACE = options.log;
+	BASEURI = 'http://' + options.host + ':' + options.port
 };
 
 util.inherits(dahua, events.EventEmitter);
 
+// Attach to camera
 dahua.prototype.connect = function(options) {
 	var self = this
-	var authHeader = 'Basic ' + new Buffer(options.user + ':' + options.pass).toString('base64');
+	var authHeader = 'Authorization: Basic ' + new Buffer(options.user + ':' + options.pass).toString('base64');
 
 	// Connect
 	var client = net.connect(options, function () {
@@ -33,13 +36,7 @@ dahua.prototype.connect = function(options) {
 		client.setKeepAlive(true,1000)
 		NetKeepAlive.setKeepAliveInterval(client,5000)	// sets TCP_KEEPINTVL to 5s
 		NetKeepAlive.setKeepAliveProbes(client, 12)	// 60s and kill the connection.
-        	handleConnection(self);
-	});
-
-	client.on('timeout', function() {
-		console.log("10 mins of inactivity")
-		//self.abort()
-		//self.connect(options)
+        	handleConnection(self,options);
 	});
 
 	client.on('data', function(data) {
@@ -56,6 +53,7 @@ dahua.prototype.connect = function(options) {
 	});
 }
 
+// Raw PTZ Command - command/arg1/arg2/arg3/arg4
 dahua.prototype.ptzCommand = function (cmd,arg1,arg2,arg3,arg4) {
     	var self = this;
 	if ((!cmd) || (isNaN(arg1)) || (isNaN(arg2)) || (isNaN(arg3)) || (isNaN(arg4))) {
@@ -69,6 +67,7 @@ dahua.prototype.ptzCommand = function (cmd,arg1,arg2,arg3,arg4) {
 	})
 }
 
+// PTZ Preset - number
 dahua.prototype.ptzPreset = function (preset) {
     	var self = this;
 	if (isNaN(preset))	handleError(self,'INVALID PTZ PRESET');
@@ -79,6 +78,7 @@ dahua.prototype.ptzPreset = function (preset) {
 	})
 }
 
+// PTZ Zoom - multiplier
 dahua.prototype.ptzZoom = function (multiple) {
     	var self = this;
 	if (isNaN(multiple))	handleError(self,'INVALID PTZ ZOOM');
@@ -88,11 +88,13 @@ dahua.prototype.ptzZoom = function (multiple) {
 
 	request(BASEURI + '/cgi-bin/ptz.cgi?action=start&channel=0&code=' + cmd + '&arg1=0&arg2=' + multiple + '&arg3=0', function (error, response, body) {
 		if ((error) || (response.statusCode !== 200) || (body.trim() !== "OK")) {
+			if (TRACE) 	console.log('FAILED TO ISSUE PTZ ZOOM');
 			self.emit("error", 'FAILED TO ISSUE PTZ ZOOM');
 		}
 	})
 }
 
+// PTZ Move - direction/action/speed
 dahua.prototype.ptzMove = function (direction,action,speed) {
     	var self = this;
 	if (isNaN(speed))	handleError(self,'INVALID PTZ SPEED');
@@ -102,28 +104,35 @@ dahua.prototype.ptzMove = function (direction,action,speed) {
 	}
 	if ((direction !== 'Up') || (direction !== 'Down') || (direction !== 'Left') || (direction !== 'Right') 
 	    (direction !== 'LeftUp') || (direction !== 'RightUp') || (direction !== 'LeftDown') || (direction !== 'RightDown')) {
-		handleError(self,'INVALID PTZ DIRECTION')
+		self.emit('error', 'INVALID PTZ DIRECTION: ' + direction)
+		if (TRACE) 	console.log('INVALID PTZ DIRECTION: ' + direction);
 		return 0
 	}
 	request(BASEURI + '/cgi-bin/ptz.cgi?action=' + action + '&channel=0&code=' + direction + '&arg1=' + speed +'&arg2=' + speed + '&arg3=0', function (error, response, body) {
 		if ((error) || (response.statusCode !== 200) || (body.trim() !== "OK")) {
 			self.emit("error", 'FAILED TO ISSUE PTZ UP COMMAND');
+			if (TRACE) 	console.log('FAILED TO ISSUE PTZ UP COMMAND');
 		}
 	})
 }
 
+// Request PTZ Status
 dahua.prototype.ptzStatus = function () {
     	var self = this;
 	request(BASEURI + '/cgi-bin/ptz.cgi?action=getStatus', function (error, response, body) {
 		if ((!error) && (response.statusCode === 200)) {
-			body = body.toString().split('\r\n')
+			body = body.toString().split('\r\n').trim()
+			if (TRACE) 	console.log('PTZ STATUS: ' + body);
 			self.emit("ptzStatus", body);
 		} else {
 			self.emit("error", 'FAILED TO QUERY STATUS');
+			if (TRACE) 	console.log('FAILED TO QUERY STATUS');
+
 		}
 	})
 }
 
+// Switch to Day Profile
 dahua.prototype.dayProfile = function () {
     	var self = this;
 	request(BASEURI + '/cgi-bin/configManager.cgi?action=setConfig&VideoInMode[0].Config[0]=1', function (error, response, body) {
@@ -132,15 +141,18 @@ dahua.prototype.dayProfile = function () {
 				request(BASEURI + '/cgi-bin/configManager.cgi?action=setConfig&VideoInOptions[0].NightOptions.SwitchMode=0', function (error, response, body) { 
 					if ((error) || (response.statusCode !== 200)) {
 						self.emit("error", 'FAILED TO CHANGE TO DAY PROFILE');
+						if (TRACE) 	console.log('FAILED TO CHANGE TO DAY PROFILE');
 					}
 				})
 			}
 		} else {
 			self.emit("error", 'FAILED TO CHANGE TO DAY PROFILE');
+			if (TRACE) 	console.log('FAILED TO CHANGE TO DAY PROFILE');
 		}	
 	})
 }
 
+// Switch to Night Profile
 dahua.prototype.nightProfile = function () {
     	var self = this;
 	request(BASEURI + '/cgi-bin/configManager.cgi?action=setConfig&VideoInMode[0].Config[0]=2', function (error, response, body) {
@@ -149,15 +161,18 @@ dahua.prototype.nightProfile = function () {
 				request(BASEURI + '/cgi-bin/configManager.cgi?action=setConfig&VideoInOptions[0].NightOptions.SwitchMode=3', function (error, response, body) { 
 					if ((error) || (response.statusCode !== 200)) {
 						self.emit("error", 'FAILED TO CHANGE TO NIGHT PROFILE');
+						if (TRACE) 	console.log('FAILED TO CHANGE TO NIGHT PROFILE');
 					}
 				})
 			}
 		} else {
 			self.emit("error", 'FAILED TO CHANGE TO NIGHT PROFILE');
+			if (TRACE) 	console.log('FAILED TO CHANGE TO NIGHT PROFILE');
 		}	
 	})
 }
 
+// Handle alarms
 function handleData(self, data) {
 	if (TRACE)	console.log('Data: ' + data.toString());
 	data = data.toString().split('\r\n')
@@ -173,22 +188,26 @@ function handleData(self, data) {
 	});
 }
 
+// Handle connection
 function handleConnection(self) {
 	if (TRACE)	console.log('Connected to ' + options.host + ':' + options.port)
     	//self.socket = socket;
 	self.emit("connect");
 }
 
+// Handle connection ended
 function handleEnd(self) {
 	if (TRACE)	console.log("Connection closed!");
 	self.emit("end");
 }
 
+// Handle Errors
 function handleError(self, err) {
 	if (TRACE)	console.log("Connection error: " + err);
 	self.emit("error", err);
 }
 
+// Prototype to see if string starts with string
 String.prototype.startsWith = function (str){
 	return this.slice(0, str.length) == str;
 };
