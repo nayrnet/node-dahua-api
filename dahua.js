@@ -189,7 +189,7 @@ function handleData(self, data) {
 }
 
 // Handle connection
-function handleConnection(self) {
+function handleConnection(self, options) {
 	if (TRACE)	console.log('Connected to ' + options.host + ':' + options.port)
     	//self.socket = socket;
 	self.emit("connect");
