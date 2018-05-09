@@ -41,6 +41,27 @@ dahua.on('alarm', function(code,action,index) {
 	if (code === 'VideoBlind' && action === 'Start')	console.log('Video Blind!')
 	if (code === 'VideoBlind' && action === 'Stop')		console.log('Video Unblind!')
 });
+
+// Find Files
+var query = {
+  'channel': '0',
+  'startTime': '2018-5-9 09:00:00',
+  'endTime': '2018-5-9 12:00:00',
+  'types': ['jpg','dav'], // [ “dav”, “jpg”, “mp4” ]
+  'count': 10 // max. 100
+};
+
+dahua.findFiles(query);
+dahua.on('filesFound',function(data){
+  console.log('filesFound:', data);
+});
+
+// Save File
+dahua.saveFile('/mnt/sd/2018-05-07/001/dav/12/12.23.16-12.23.33[M][0@0][0].dav');
+dahua.on('saveFile',function( msg ){
+  console.log('File saved!');
+});
+
 ```
 
 ## Functions:
@@ -69,6 +90,31 @@ dahua.ptzMove(direction,action,speed)
 // Request current PTZ Status
 dahua.ptzStatus()
 
+// Find files
+var query = {
+  'channel': '0',
+  'startTime': '2018-5-9 09:00:00',
+  'endTime': '2018-5-9 12:00:00',
+  'types': ['jpg','dav'], // [ “dav”, “jpg”, “mp4” ] - optional
+  'count': 10 // max. 100 - optional
+};
+dahua.findFiles(query)
+
+// Callback for file search results
+dahua.on('filesFound',function(data){
+  console.log('filesFound:', data);
+});
+
+// Load and save file
+// remotename = filepath and name on camera
+// localname = filepath and name on client (optional)
+dahua.saveFile(remotename,localname);
+
+// Callback for file saved
+dahua.on('saveFile',function( msg ){
+  console.log('File saved!');
+});
+
 // Callback for any Alarm (Motion Detection/Video Loss & Blank/Alarm Inputs)
 dahua.on('alarm', function(code,action,index){  });
 
@@ -92,6 +138,6 @@ dahua.on('error', function(error){  });
 
 ## More Info:
 * Support & Discussion: https://www.ipcamtalk.com/showthread.php/9004-NodeJS-Module-node-dahua-api?p=80111
-
+* Dahua API Documentation: https://www.telecamera.ru/bitrix/components/bitrix/forum.interface/show_file.php?fid=1022477&action=download
 ## About:
 By: Ryan Hunt
