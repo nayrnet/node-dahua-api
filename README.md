@@ -135,6 +135,7 @@ dahua.on('error', function(error){  });
 * user - username for camera
 * pass - password for camera
 * log - boolean to show detailed logs, defaults to false.
+* cameraAlarms - boolean to listen to camera alarms, defaults to true
 
 ## More Info:
 * Support & Discussion: https://www.ipcamtalk.com/showthread.php/9004-NodeJS-Module-node-dahua-api?p=80111
