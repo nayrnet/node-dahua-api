@@ -4,6 +4,7 @@
 var events    = require('events');
 var util      = require('util');
 var request   = require('request');
+var NetKeepAlive = require('net-keepalive')
 
 var setKeypath = require('keypather/set');
 var fs = require('fs');
@@ -22,7 +23,7 @@ var dahua = function(options) {
   USER = options.user;
   PASS = options.pass;
 
-  this.client = this.connect(options);
+  if( options.cameraAlarms || true ) this.client = this.connect(options);
 
   this.on('error',function(err){
     console.log("Error: " + err);
@@ -32,23 +33,36 @@ var dahua = function(options) {
 
 util.inherits(dahua, events.EventEmitter);
 
+// set up persistent connection to recieve alarm events from camera
 dahua.prototype.connect = function(options) {
   
     var self = this;
 
     var opts = { 
       'url' : BASEURI + '/cgi-bin/eventManager.cgi?action=attach&codes=[AlarmLocal,VideoMotion,VideoLoss,VideoBlind]',
-      'keepAlive' : true,
-      headers: {'Accept':'multipart/x-mixed-replace'}
+      'forever' : true,
+      'headers': {'Accept':'multipart/x-mixed-replace'}
     };
 
     var client = request(opts).auth(USER,PASS,false);
 
-    // client.on('timeout', function() {
-    //  console.log("10 mins of inactivity")
-    //  //self.abort()
-    //  //self.connect(options)
-    // });
+    client.on('socket', function(socket) {
+      // Set keep-alive probes - throws ESOCKETTIMEDOUT error after ~16min if connection broken
+      NetKeepAlive.setKeepAliveInterval(socket, 1000);
+      if (TRACE) console.log('TCP_KEEPINTVL:',NetKeepAlive.getKeepAliveInterval(socket)); 
+      
+      NetKeepAlive.setKeepAliveProbes(socket, 1);
+      if (TRACE) console.log('TCP_KEEPCNT:',NetKeepAlive.getKeepAliveProbes(socket));
+      
+    });
+
+    client.on('response', function() {  
+      handleDahuaEventConnection(self,options);
+    });
+
+    client.on('error', function(err) {
+      handleDahuaEventError(self, err);
+    });
 
     client.on('data', function(data) {
        handleDahuaEventData(self, data);
@@ -63,27 +77,25 @@ dahua.prototype.connect = function(options) {
       handleDahuaEventError(self, err);
     });
 
-    handleDahuaEventConnection(self,options);
-
 };
 
 function handleDahuaEventData(self, data) {
   if (TRACE)  console.log('Data: ' + data.toString());
-  data = data.toString().split('\r\n')
+  data = data.toString().split('\r\n');
   var i = Object.keys(data);
   i.forEach(function(id){
     if (data[id].startsWith('Code=')) {
-      var alarm = data[id].split(';')
-      var code = alarm[0].substr(5)
-      var action = alarm[1].substr(7)
-      var index = alarm[2].substr(6)
+      var alarm = data[id].split(';');
+      var code = alarm[0].substr(5);
+      var action = alarm[1].substr(7);
+      var index = alarm[2].substr(6);
       self.emit("alarm", code,action,index);
     }
   });
 }
 
 function handleDahuaEventConnection(self,options) {
-  if (TRACE)  console.log('Connected to ' + options.host + ':' + options.port)
+  if (TRACE)  console.log('Connected to ' + options.host + ':' + options.port);
   //self.socket = socket;
   self.emit("connect");
 }
@@ -93,23 +105,25 @@ function handleDahuaEventEnd(self) {
   self.emit("end");
 }
 
-function handleDahuaError(self, err) {
+function handleDahuaEventError(self, err) {
   if (TRACE)  console.log("Connection error: " + err);
   self.emit("error", err);
 }
 
+
+
 dahua.prototype.ptzCommand = function (cmd,arg1,arg2,arg3,arg4) {
   var self = this;
   if ((!cmd) || (isNaN(arg1)) || (isNaN(arg2)) || (isNaN(arg3)) || (isNaN(arg4))) {
-    self.emit("error",'INVALID PTZ COMMAND')
-    return 0
+    self.emit("error",'INVALID PTZ COMMAND');
+    return 0;
   }
   request(BASEURI + '/cgi-bin/ptz.cgi?action=start&channel=0&code=' + ptzcommand + '&arg1=' + arg1 + '&arg2=' + arg2 + '&arg3=' + arg3 + '&arg4=' + arg4, function (error, response, body) {
     if ((error) || (response.statusCode !== 200) || (body.trim() !== "OK")) {
       self.emit("error", 'FAILED TO ISSUE PTZ COMMAND');
     }
   }).auth(USER,PASS,false);
-}
+};
 
 dahua.prototype.ptzPreset = function (preset) {
   var self = this;
@@ -119,7 +133,7 @@ dahua.prototype.ptzPreset = function (preset) {
       self.emit("error", 'FAILED TO ISSUE PTZ PRESET');
     }
   }).auth(USER,PASS,false);
-}
+};
 
 dahua.prototype.ptzZoom = function (multiple) {
   var self = this;
@@ -133,38 +147,38 @@ dahua.prototype.ptzZoom = function (multiple) {
       self.emit("error", 'FAILED TO ISSUE PTZ ZOOM');
     }
   }).auth(USER,PASS,false);
-}
+};
 
 dahua.prototype.ptzMove = function (direction,action,speed) {
   var self = this;
   if (isNaN(speed)) self.emit("error",'INVALID PTZ SPEED');
   if ((action !== 'start') || (action !== 'stop')) {
-    self.emit("error",'INVALID PTZ COMMAND')
-    return 0
+    self.emit("error",'INVALID PTZ COMMAND');
+    return 0;
   }
-  if ((direction !== 'Up') || (direction !== 'Down') || (direction !== 'Left') || (direction !== 'Right') 
+  if ((direction !== 'Up') || (direction !== 'Down') || (direction !== 'Left') || (direction !== 'Right') ||
       (direction !== 'LeftUp') || (direction !== 'RightUp') || (direction !== 'LeftDown') || (direction !== 'RightDown')) {
-    self.emit("error",'INVALID PTZ DIRECTION')
-    return 0
+    self.emit("error",'INVALID PTZ DIRECTION');
+    return 0;
   }
   request(BASEURI + '/cgi-bin/ptz.cgi?action=' + action + '&channel=0&code=' + direction + '&arg1=' + speed +'&arg2=' + speed + '&arg3=0', function (error, response, body) {
     if ((error) || (response.statusCode !== 200) || (body.trim() !== "OK")) {
       self.emit("error", 'FAILED TO ISSUE PTZ UP COMMAND');
     }
   }).auth(USER,PASS,false);
-}
+};
 
 dahua.prototype.ptzStatus = function () {
   var self = this;
   request(BASEURI + '/cgi-bin/ptz.cgi?action=getStatus', function (error, response, body) {
     if ((!error) && (response.statusCode === 200)) {
-      body = body.toString().split('\r\n')
+      body = body.toString().split('\r\n');
       self.emit("ptzStatus", body);
     } else {
       self.emit("error", 'FAILED TO QUERY STATUS');
     }
   }).auth(USER,PASS,false);
-}
+};
 
 dahua.prototype.dayProfile = function () {
   var self = this;
@@ -181,7 +195,7 @@ dahua.prototype.dayProfile = function () {
       self.emit("error", 'FAILED TO CHANGE TO DAY PROFILE');
     } 
   }).auth(USER,PASS,false);
-}
+};
 
 dahua.prototype.nightProfile = function () {
   var self = this;
@@ -198,7 +212,7 @@ dahua.prototype.nightProfile = function () {
       self.emit("error", 'FAILED TO CHANGE TO NIGHT PROFILE');
     } 
   }).auth(USER,PASS,false);
-}
+};
 
 
 /*====================================
@@ -210,8 +224,8 @@ dahua.prototype.findFiles = function(query){
     var self = this;
     
     if ((!query.channel) || (!query.startTime) || (!query.endTime)) {
-      self.emit("error",'FILE FIND MISSING ARGUMENTS')
-      return 0
+      self.emit("error",'FILE FIND MISSING ARGUMENTS');
+      return 0;
     }
     
     // create a finder
@@ -270,9 +284,9 @@ dahua.prototype.createFileFind = function () {
     var oid = body.trim().substr(7);
     self.emit("fileFinderCreated",oid);
 
-  }).auth(USER,PASS,false)
+  }).auth(USER,PASS,false);
 
-}
+};
 
 
 // 10.1.2 StartFind
@@ -297,17 +311,16 @@ dahua.prototype.createFileFind = function () {
 // OK or Error
 // 
 
-
 // To be Done: Implement Dirs, Types, Flags, Event Args
 
 dahua.prototype.startFileFind = function (objectId,channel,startTime,endTime,types) { // Dirs,Types,Flags,Event) {
   var self = this;
   if ((!objectId) || (!channel) || (!startTime) || (!endTime) ) {
-    self.emit("error",'INVALID FINDFILE COMMAND - MISSING ARGS')
-    return 0
+    self.emit("error",'INVALID FINDFILE COMMAND - MISSING ARGS');
+    return 0;
   }
 
-  var types = types || [];
+  types = types || [];
   var typesQueryString = "";
 
   types.forEach(function(el,idx){
@@ -383,7 +396,7 @@ dahua.prototype.startFileFind = function (objectId,channel,startTime,endTime,typ
 dahua.prototype.nextFileFind = function (objectId,count) {
   
   var self = this;
-  var count = count || 100;
+  count = count || 100;
 
   if ((!objectId)) {
     self.emit("error",'INVALID NEXT FILE COMMAND');
@@ -433,8 +446,8 @@ dahua.prototype.nextFileFind = function (objectId,count) {
 dahua.prototype.closeFileFind = function (objectId) {
   var self = this;
   if ((!objectId)) {
-    self.emit("error",'OBJECT ID MISSING')
-    return 0
+    self.emit("error",'OBJECT ID MISSING');
+    return 0;
   }
   request(BASEURI + '/cgi-bin/mediaFileFind.cgi?action=close&object=' + objectId, function (error, response, body) {
     if ((error) || (response.statusCode !== 200) || (body.trim() !== "OK")) {
@@ -443,9 +456,9 @@ dahua.prototype.closeFileFind = function (objectId) {
     
     self.emit('closeFileFindDone',objectId,body.trim());
 
-  }).auth(USER,PASS,false)
+  }).auth(USER,PASS,false);
 
-}
+};
 
 // 10.1.5 Destroy
 // URL Syntax
@@ -460,8 +473,8 @@ dahua.prototype.closeFileFind = function (objectId) {
 dahua.prototype.destroyFileFind = function (objectId) {
   var self = this;
   if ((!objectId)) {
-    self.emit("error",'OBJECT ID MISSING')
-    return 0
+    self.emit("error",'OBJECT ID MISSING');
+    return 0;
   }
   request(BASEURI + '/cgi-bin/mediaFileFind.cgi?action=destroy&object=' + objectId, function (error, response, body) {
     if ((error) || (response.statusCode !== 200) || (body.trim() !== "OK")) {
@@ -471,7 +484,7 @@ dahua.prototype.destroyFileFind = function (objectId) {
     self.emit('destroyFileFindDone',objectId,body.trim());
 
   }).auth(USER,PASS,false);
-}
+};
 
 /*=====  End of File Finding  ======*/
 

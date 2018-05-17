@@ -6,7 +6,8 @@
   "dependencies": {
     "path": "^0.12.7",
     "keypather": "^3.0.0",
-    "request": "^2.85.0"
+    "request": "^2.85.0",
+    "net-keepalive": "^1.1.1"
   },
   "devDependencies": {},
   "scripts": {

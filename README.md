@@ -19,7 +19,7 @@ var options = {
 	port 	: '80',
 	user 	: 'admin',
 	pass 	: 'password123',
-	log 	: false,
+	log 	: false
 };
 
 var dahua 	= new ipcamera.dahua(options);
