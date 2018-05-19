@@ -1,10 +1,14 @@
 {
   "name": "node-dahua-api",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "Dahua HTTP API Module",
   "main": "dahua.js",
   "dependencies": {
-    "net-keepalive": "^0.3.3"
+    "keypather": "^3.0.0",
+    "net-keepalive": "^1.1.1",
+    "path": "^0.12.7",
+    "request": "^2.85.0",
+    "request-progress": "^3.0.0"
   },
   "devDependencies": {},
   "scripts": {
