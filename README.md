@@ -57,9 +57,23 @@ dahua.on('filesFound',function(data){
 });
 
 // Save File
-dahua.saveFile('/mnt/sd/2018-05-07/001/dav/12/12.23.16-12.23.33[M][0@0][0].dav');
+var fileMeta = { 
+       Channel: '0',
+       EndTime: '2018-05-19 10:45:00',
+       FilePath: '/mnt/sd/2018-05-19/001/dav/10/10.36.45-10.45.00[R][0@0][0].dav',
+       StartTime: '2018-05-19 10:36:45',
+       Type: 'dav'
+};
+
+dahua.saveFile(fileMeta);
 dahua.on('saveFile',function( msg ){
   console.log('File saved!');
+});
+
+// Get a snapshot
+dahua.getSnapshot();
+dahua.on('getSnapshot',function( msg ){
+  console.log(msg);
 });
 
 ```
@@ -105,14 +119,33 @@ dahua.on('filesFound',function(data){
   console.log('filesFound:', data);
 });
 
-// Load and save file
-// remotename = filepath and name on camera
-// localname = filepath and name on client (optional)
-dahua.saveFile(remotename,localname);
+// Save file
+// requires a the following options for filename creation
+// attributes equal findFile results object structure
+var fileMeta = { 
+       Channel: '0',
+       EndTime: '2018-05-19 10:45:00',
+       FilePath: '/mnt/sd/2018-05-19/001/dav/10/10.36.45-10.45.00[R][0@0][0].dav',
+       StartTime: '2018-05-19 10:36:45',
+       Type: 'dav'
+};
+dahua.saveFile(fileMeta);
 
 // Callback for file saved
 dahua.on('saveFile',function( msg ){
   console.log('File saved!');
+});
+
+// Get a snapshot
+var options = {
+  'path': 'snaps', // optinal, where to save the file
+  'channel':'', // optional, defaults to 0,
+  'filename' : '', // optional, defaults to [HOST]_ch[channel]_[TIMESTAMP]
+};
+  
+dahua.getSnapshot();
+dahua.on('getSnapshot',function( msg ){
+  console.log(msg);
 });
 
 // Callback for any Alarm (Motion Detection/Video Loss & Blank/Alarm Inputs)

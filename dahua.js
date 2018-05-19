@@ -4,11 +4,13 @@
 var events    = require('events');
 var util      = require('util');
 var request   = require('request');
+var progress = require('request-progress');
 var NetKeepAlive = require('net-keepalive')
 
 var setKeypath = require('keypather/set');
 var fs = require('fs');
 var path = require('path');
+var moment = require('moment');
 
 var TRACE   = true;
 var BASEURI   = false;
@@ -22,8 +24,13 @@ var dahua = function(options) {
   BASEURI = 'http://'+ options.host + ':' + options.port;
   USER = options.user;
   PASS = options.pass;
+  HOST = options.host;
 
-  if( options.cameraAlarms || true ) this.client = this.connect(options);
+  if( options.cameraAlarms === undefined ) {
+    options.cameraAlarms = true;
+  } 
+
+  if( options.cameraAlarms ) { this.client = this.connect(options) };
 
   this.on('error',function(err){
     console.log("Error: " + err);
@@ -511,31 +518,151 @@ dahua.prototype.saveFile = function (file,filename) {
   var self = this;
 
   if ((!file)) {
-    self.emit("error",'FILENAME MISSING');
+    self.emit("error",'FILE OBJECT MISSING');
+    return 0;
+  }
+
+  if ((!file.FilePath)) {
+    self.emit("error",'FILEPATH in FILE OBJECT MISSING');
     return 0;
   }
   
-  filename = filename || path.parse(file).name;
+  if(!filename) {
 
-  request(BASEURI + '/cgi-bin/RPC_Loadfile/' + file, function (error, response, body) {
-    if ((error) || (response.statusCode !== 200)) {
-      
+    if( !file.Channel || !file.StartTime || !file.EndTime || !file.Type ) {
+     self.emit("error",'FILE OBJECT ATTRIBUTES MISSING');
+     return 0;
+    }
+
+     // the fileFind response obejct
+     // { Channel: '0',
+     // Cluster: '0',
+     // Compressed: 'false',
+     // CutLength: '634359892',
+     // Disk: '0',
+     // Duration: '495',
+     // EndTime: '2018-05-19 10:45:00',
+     // FilePath: '/mnt/sd/2018-05-19/001/dav/10/10.36.45-10.45.00[R][0@0][0].dav',
+     // Flags: [Object],
+     // Length: '634359892',
+     // Overwrites: '0',
+     // Partition: '0',
+     // Redundant: 'false',
+     // Repeat: '0',
+     // StartTime: '2018-05-19 10:36:45',
+     // Summary: [Object],
+     // SummaryOffset: '0',
+     // Type: 'dav',
+     // WorkDir: '/mnt/sd',
+     // WorkDirSN: '0' };
+
+     filename = this.generateFilename(HOST,file.Channel,file.StartTime,file.EndTime,file.Type);
+
+  } 
+ 
+  progress(request(BASEURI + '/cgi-bin/RPC_Loadfile/' + file.FilePath))
+  .auth(USER,PASS,false)
+  .on('progress', function (state) {
+      if(TRACE) {
+        console.log('Downloaded', Math.floor(state.percent * 100) + '%','@ '+Math.floor(state.speed / 1000), 'KByte/s' );
+      }
+  })
+  .on('response',function(response){
+      if (response.statusCode !== 200) {
+        self.emit("error", 'ERROR ON LOAD FILE COMMAND');
+      } 
+  })
+  .on('error',function (error){
       if(error.code == "ECONNRESET") {
         self.emit("error", 'ERROR ON LOAD FILE COMMAND - FILE NOT FOUND?');
       } else {
         self.emit("error", 'ERROR ON LOAD FILE COMMAND');
       }
-
-    } else {    
-      self.emit("saveFile", {'status':'DONE'});
-    }
   })
-  .auth(USER,PASS,false).pipe(fs.createWriteStream(filename));
+  .on('end',function() {
+    self.emit("saveFile", {
+      'status':'DONE',
+    });
+  })
+  .pipe(fs.createWriteStream(filename));
   // TBD: file writing error handling
 
 };
 
+
+
+
 /*=====  End of Load File  ======*/
+
+
+/*====================================
+=            Get Snapshot            =
+====================================*/
+
+// API Description
+// 
+// URL Syntax 
+// http://<ip>/cgi-bin/snapshot.cgi? [channel=<channelNo>]
+
+// Response
+// A picture encoded by jpg
+
+// Comment
+// The channel number is default 0 if the request is not carried the param.
+
+dahua.prototype.getSnapshot = function (options) {
+  var self = this;
+
+  if(options === undefined) {
+    var options = {};
+  }
+
+  if ((!options.channel)) {
+    options.channel = 0;
+  }
+
+  if ((!options.path)) {
+    options.path = '';
+  }
+
+  if (!options.filename) {
+    options.filename = this.generateFilename(HOST,options.channel,moment(),'','jpg');
+  }
+
+  request(BASEURI + '/cgi-bin/snapshot.cgi?' + options.channel , function (error, response, body) {
+    if ((error) || (response.statusCode !== 200)) {
+      self.emit("error", 'ERROR ON SNAPSHOT');
+    } 
+  })
+  .on('end',function(){
+    if(TRACE) console.log('SNAPSHOT SAVED');
+    self.emit("getSnapshot", {
+    'status':'DONE',});
+  })
+  .auth(USER,PASS,false).pipe(fs.createWriteStream(path.join(options.path,options.filename)));
+  // TBD: file writing error handling
+
+};
+
+/*=====  End of Get Snapshot  ======*/
+
+dahua.prototype.generateFilename = function( device, channel, start, end, filetype ) {
+
+  filename = device + '_ch' + channel + '_';
+
+  // to be done: LOCALIZATION ?
+  startDate = moment(start);
+  
+  filename += startDate.format('YYYYMMDDhhmmss');
+  if(end) {
+    endDate = moment(end);
+    filename += '_' + endDate.format('YYYYMMDDhhmmss');
+  }
+  filename += '.' + filetype;
+
+  return filename; 
+
+};
 
 
 String.prototype.startsWith = function (str){
