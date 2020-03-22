@@ -118,7 +118,25 @@ function handleDahuaEventData(self, data) {
       var code = alarm[0].substr(5);
       var action = alarm[1].substr(7);
       var index = alarm[2].substr(6);
-      self.emit("alarm", code,action,index);
+
+    // an alarm can have also a data object
+    // which is multiline in the body
+    var metadata = {};
+    if (alarm[3].startsWith('data={')) {
+        var metadataArray = alarm[3].split('\n');
+        metadataArray[0] = '{'; // we don't want "data={"
+
+        var metadata = metadataArray.join('');
+        try {
+            metadata = JSON.parse(metadata);
+            if (TRACE) console.dir(metadata, 'Got JSON parsed metadata');
+        }
+        catch (e) {
+            console.error(e, 'Error during JSON.parse of alarm extra data');
+        }
+    }
+
+      self.emit("alarm", code,action,index, metadata);
     }
   });
 }
