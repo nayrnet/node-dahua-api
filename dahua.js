@@ -1,4 +1,4 @@
-#!/usr/bin/nodejs
+// #!/usr/bin/nodejs
 // Dahua HTTP API Module
 
 var events    = require('events');
