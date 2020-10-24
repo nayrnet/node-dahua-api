@@ -66,7 +66,7 @@ dahua.prototype.connect = function(options) {
         'MDResult',
         'HeatImagingTemper',
         'SmartMotionHuman',
-        'SmartMotionVehicle
+        'SmartMotionVehicle'
     ];
 
     var opts = {
