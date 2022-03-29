@@ -1,6 +1,6 @@
 {
   "name": "node-dahua-api",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Dahua HTTP API Module",
   "main": "dahua.js",
   "dependencies": {
@@ -16,7 +16,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nayrnet/node-dahua-api.git"
+    "url": "git+https://github.com/FrankZZ/node-dahua-api.git"
   },
   "keywords": [
     "Dahua",
@@ -28,7 +28,7 @@
   "author": "Ryan Hunt",
   "license": "GPL-3.0",
   "bugs": {
-    "url": "https://github.com/nayrnet/node-dahua-api/issues"
+    "url": "https://github.com/FrankZZ/node-dahua-api/issues"
   },
-  "homepage": "https://github.com/nayrnet/node-dahua-api#readme"
+  "homepage": "https://github.com/FrankZZ/node-dahua-api#readme"
 }
