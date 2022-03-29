@@ -75,10 +75,12 @@ dahua.prototype.connect = function(options) {
       'headers': {'Accept':'multipart/x-mixed-replace'}
     };
 
+    console.log("Connecting...");
     var client = request(opts).auth(USER,PASS,false);
 
     client.on('socket', function(socket) {
       // Set keep-alive probes - throws ESOCKETTIMEDOUT error after ~16min if connection broken
+      socket.setKeepAlive(true, 1000);
       NetKeepAlive.setKeepAliveInterval(socket, 1000);
       if (TRACE) console.log('TCP_KEEPINTVL:',NetKeepAlive.getKeepAliveInterval(socket));
 
@@ -100,6 +102,7 @@ dahua.prototype.connect = function(options) {
     });
 
     client.on('close', function() {   // Try to reconnect after 30s
+      console.error("Connection closed- reconnecting in 30 seconds...");
       setTimeout(function() { self.connect(options); }, 30000 );
       handleDahuaEventEnd(self);
     });
