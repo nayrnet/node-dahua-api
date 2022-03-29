@@ -1,4 +1,4 @@
-#!/usr/bin/nodejs
+// #!/usr/bin/nodejs
 // Dahua HTTP API Module
 
 var events    = require('events');
@@ -14,13 +14,16 @@ var moment = require('moment');
 
 var TRACE   = true;
 var BASEURI   = false;
+var USER;
+var HOST;
+var PASS;
 
 var dahua = function(options) {
-  
+
   events.EventEmitter.call(this);
-  
+
   TRACE = options.log;
-  
+
   BASEURI = 'http://'+ options.host + ':' + options.port;
   USER = options.user;
   PASS = options.pass;
@@ -28,9 +31,9 @@ var dahua = function(options) {
 
   if( options.cameraAlarms === undefined ) {
     options.cameraAlarms = true;
-  } 
+  }
 
-  if( options.cameraAlarms ) { this.client = this.connect(options) };
+  if( options.cameraAlarms ) { this.client = this.connect(options) }
 
   this.on('error',function(err){
     console.log("Error: " + err);
@@ -42,28 +45,34 @@ util.inherits(dahua, events.EventEmitter);
 
 // set up persistent connection to recieve alarm events from camera
 dahua.prototype.connect = function(options) {
-  
+
     var self = this;
 
-    var opts = { 
-      'url' : BASEURI + '/cgi-bin/eventManager.cgi?action=attach&codes=[AlarmLocal,VideoMotion,VideoLoss,VideoBlind]',
+    var eventNames = [
+        'All'
+    ];
+
+    var opts = {
+      'url' : BASEURI + '/cgi-bin/eventManager.cgi?action=attach&codes=[' + eventNames.join(',') + ']',
       'forever' : true,
       'headers': {'Accept':'multipart/x-mixed-replace'}
     };
 
+    console.log("Connecting...");
     var client = request(opts).auth(USER,PASS,false);
 
     client.on('socket', function(socket) {
       // Set keep-alive probes - throws ESOCKETTIMEDOUT error after ~16min if connection broken
+      socket.setKeepAlive(true, 1000);
       NetKeepAlive.setKeepAliveInterval(socket, 1000);
-      if (TRACE) console.log('TCP_KEEPINTVL:',NetKeepAlive.getKeepAliveInterval(socket)); 
-      
+      if (TRACE) console.log('TCP_KEEPINTVL:',NetKeepAlive.getKeepAliveInterval(socket));
+
       NetKeepAlive.setKeepAliveProbes(socket, 1);
       if (TRACE) console.log('TCP_KEEPCNT:',NetKeepAlive.getKeepAliveProbes(socket));
-      
+
     });
 
-    client.on('response', function() {  
+    client.on('response', function() {
       handleDahuaEventConnection(self,options);
     });
 
@@ -76,6 +85,7 @@ dahua.prototype.connect = function(options) {
     });
 
     client.on('close', function() {   // Try to reconnect after 30s
+      console.error("Connection closed- reconnecting in 30 seconds...");
       setTimeout(function() { self.connect(options); }, 30000 );
       handleDahuaEventEnd(self);
     });
@@ -93,10 +103,32 @@ function handleDahuaEventData(self, data) {
   i.forEach(function(id){
     if (data[id].startsWith('Code=')) {
       var alarm = data[id].split(';');
-      var code = alarm[0].substr(5);
-      var action = alarm[1].substr(7);
-      var index = alarm[2].substr(6);
-      self.emit("alarm", code,action,index);
+      if (alarm.length >= 3) {
+        var code = alarm[0].substr(5);
+        var action = alarm[1].substr(7);
+        var index = alarm[2].substr(6);
+
+      // an alarm can have also a data object
+      // which is multiline in the body
+      var metadata = {};
+
+      if (alarm.length >= 4 && alarm[3].startsWith('data={')) {
+          var metadataArray = alarm[3].split('\n');
+          metadataArray[0] = '{'; // we don't want "data={"
+
+          metadata = metadataArray.join('');
+          try {
+              metadata = JSON.parse(metadata);
+              if (TRACE) console.dir(metadata, 'Got JSON parsed metadata');
+          }
+          catch (e) {
+              self.emit("error", "Error during JSON.parse of alarm extra data");
+              console.error(e, 'Error during JSON.parse of alarm extra data');
+          }
+      }
+
+        self.emit("alarm", code,action,index, metadata);
+      }
     }
   });
 }
@@ -192,7 +224,7 @@ dahua.prototype.dayProfile = function () {
   request(BASEURI + '/cgi-bin/configManager.cgi?action=setConfig&VideoInMode[0].Config[0]=1', function (error, response, body) {
     if ((!error) && (response.statusCode === 200)) {
       if (body === 'Error') {   // Didnt work, lets try another method for older cameras
-        request(BASEURI + '/cgi-bin/configManager.cgi?action=setConfig&VideoInOptions[0].NightOptions.SwitchMode=0', function (error, response, body) { 
+        request(BASEURI + '/cgi-bin/configManager.cgi?action=setConfig&VideoInOptions[0].NightOptions.SwitchMode=0', function (error, response, body) {
           if ((error) || (response.statusCode !== 200)) {
             self.emit("error", 'FAILED TO CHANGE TO DAY PROFILE');
           }
@@ -200,7 +232,7 @@ dahua.prototype.dayProfile = function () {
       }
     } else {
       self.emit("error", 'FAILED TO CHANGE TO DAY PROFILE');
-    } 
+    }
   }).auth(USER,PASS,false);
 };
 
@@ -209,7 +241,7 @@ dahua.prototype.nightProfile = function () {
   request(BASEURI + '/cgi-bin/configManager.cgi?action=setConfig&VideoInMode[0].Config[0]=2', function (error, response, body) {
     if ((!error) && (response.statusCode === 200)) {
       if (body === 'Error') {   // Didnt work, lets try another method for older cameras
-        request(BASEURI + '/cgi-bin/configManager.cgi?action=setConfig&VideoInOptions[0].NightOptions.SwitchMode=3', function (error, response, body) { 
+        request(BASEURI + '/cgi-bin/configManager.cgi?action=setConfig&VideoInOptions[0].NightOptions.SwitchMode=3', function (error, response, body) {
           if ((error) || (response.statusCode !== 200)) {
             self.emit("error", 'FAILED TO CHANGE TO NIGHT PROFILE');
           }
@@ -217,7 +249,7 @@ dahua.prototype.nightProfile = function () {
       }
     } else {
       self.emit("error", 'FAILED TO CHANGE TO NIGHT PROFILE');
-    } 
+    }
   }).auth(USER,PASS,false);
 };
 
@@ -227,14 +259,14 @@ dahua.prototype.nightProfile = function () {
 ====================================*/
 
 dahua.prototype.findFiles = function(query){
-    
+
     var self = this;
-    
+
     if ((!query.channel) || (!query.startTime) || (!query.endTime)) {
       self.emit("error",'FILE FIND MISSING ARGUMENTS');
       return 0;
     }
-    
+
     // create a finder
     this.createFileFind();
 
@@ -246,18 +278,18 @@ dahua.prototype.findFiles = function(query){
 
     // fetch results
     this.on('startFileFindDone',function(objectId,body){
-      if (TRACE) console.log('startFileFindDone:',objectId,body);   
+      if (TRACE) console.log('startFileFindDone:',objectId,body);
       self.nextFileFind(objectId,query.count);
     });
 
-    // handle the results 
+    // handle the results
     this.on('nextFileFindDone',function(objectId,items){
 
       if (TRACE) console.log('nextFileFindDone:',objectId);
       items.query = query;
-      self.emit('filesFound',items);  
+      self.emit('filesFound',items);
       self.closeFileFind(objectId);
-    
+
     });
 
     // close and destroy the finder
@@ -275,12 +307,12 @@ dahua.prototype.findFiles = function(query){
 // 10.1.1 Create
 // URL Syntax
 // http://<ip>/cgi-bin/mediaFileFind.cgi?action=factory.create
- 
+
 // Comment
 // Create a media file finder
 // Response
 // result=08137
- 
+
 dahua.prototype.createFileFind = function () {
   var self = this;
   request(BASEURI + '/cgi-bin/mediaFileFind.cgi?action=factory.create', function (error, response, body) {
@@ -297,7 +329,7 @@ dahua.prototype.createFileFind = function () {
 
 
 // 10.1.2 StartFind
- 
+
 // URL Syntax
 // http://<ip>/cgi-bin/mediaFileFind.cgi?action=findFile&object=<objectId>&condition.Channel=<channel>&condition.StartTime= <start>&condition.EndT ime=<end>&condition.Dirs[0]=<dir>&condition.Types[0]=<type>&condition.Flag[0]=<flag>&condition.E vents[0]=<event>
 
@@ -316,7 +348,7 @@ dahua.prototype.createFileFind = function () {
 
 // Response
 // OK or Error
-// 
+//
 
 // To be Done: Implement Dirs, Types, Flags, Event Args
 
@@ -336,7 +368,7 @@ dahua.prototype.startFileFind = function (objectId,channel,startTime,endTime,typ
 
   var url = BASEURI + '/cgi-bin/mediaFileFind.cgi?action=findFile&object=' + objectId + '&condition.Channel=' + channel + '&condition.StartTime=' + startTime + '&condition.EndTime=' + endTime + typesQueryString;
   // console.log(url);
-  
+
   request(url, function (error, response, body) {
     if ((error)) {
       if (TRACE) console.log('startFileFind Error:',error);
@@ -344,7 +376,7 @@ dahua.prototype.startFileFind = function (objectId,channel,startTime,endTime,typ
     } else {
       if (TRACE) console.log('startFileFind Response:',body.trim());
 
-      // no results = http code 400 ? 
+      // no results = http code 400 ?
       //if(response.statusCode == 400 ) {
       //  self.emit("error", 'FAILED TO ISSUE FIND FILE COMMAND - NO RESULTS ?');
       //} else {
@@ -359,13 +391,13 @@ dahua.prototype.startFileFind = function (objectId,channel,startTime,endTime,typ
 
 // 10.1.3 FindNextFile
 // URL Syntax
- 
+
 // http://<ip>/cgi-bin/mediaFileFind.cgi?action=findNextFile&object=<objectId>&count=<fileCount>
- 
+
 // Comment
 // Find the next fileCount files.
 // The maximum value of fileCount is 100.
- 
+
 // Response
 // found=1
 // items[0]. Channel =1
@@ -397,11 +429,11 @@ dahua.prototype.startFileFind = function (objectId,channel,startTime,endTime,typ
 // WorkDir - The file’s directory
 // Overwrites - Overwrite times of the work directory
 // WorkDirSN - Workdir No
-// 
-// 
+//
+//
 
 dahua.prototype.nextFileFind = function (objectId,count) {
-  
+
   var self = this;
   count = count || 100;
 
@@ -415,12 +447,12 @@ dahua.prototype.nextFileFind = function (objectId,count) {
       if (TRACE) console.log('nextFileFind Error:',error);
       self.emit("error", 'FAILED NEXT FILE COMMAND');
     }
-    
+
     // if (TRACE) console.log('nextFileFind Response:',body.trim());
 
     var items = {};
     var data = body.split('\r\n');
-    
+
     // getting found count
     items.found = data[0].split("=")[1];
 
@@ -441,7 +473,7 @@ dahua.prototype.nextFileFind = function (objectId,count) {
 
 
 // 10.1.4 Close
-// URL Syntax 
+// URL Syntax
 // http://<ip>/cgi-bin/mediaFileFind.cgi?action=close&object=<objectId>
 
 // Comment
@@ -460,7 +492,7 @@ dahua.prototype.closeFileFind = function (objectId) {
     if ((error) || (response.statusCode !== 200) || (body.trim() !== "OK")) {
       self.emit("error", 'ERROR ON CLOSE FILE FIND COMMAND');
     }
-    
+
     self.emit('closeFileFindDone',objectId,body.trim());
 
   }).auth(USER,PASS,false);
@@ -501,8 +533,8 @@ dahua.prototype.destroyFileFind = function (objectId) {
 ================================*/
 
 // API Description
-// 
-// URL Syntax 
+//
+// URL Syntax
 // http://<ip>/cgi-bin/RPC_Loadfile/<filename>
 
 // Response
@@ -526,7 +558,7 @@ dahua.prototype.saveFile = function (file,filename) {
     self.emit("error",'FILEPATH in FILE OBJECT MISSING');
     return 0;
   }
-  
+
   if(!filename) {
 
     if( !file.Channel || !file.StartTime || !file.EndTime || !file.Type ) {
@@ -558,8 +590,8 @@ dahua.prototype.saveFile = function (file,filename) {
 
      filename = this.generateFilename(HOST,file.Channel,file.StartTime,file.EndTime,file.Type);
 
-  } 
- 
+  }
+
   progress(request(BASEURI + '/cgi-bin/RPC_Loadfile/' + file.FilePath))
   .auth(USER,PASS,false)
   .on('progress', function (state) {
@@ -570,7 +602,7 @@ dahua.prototype.saveFile = function (file,filename) {
   .on('response',function(response){
       if (response.statusCode !== 200) {
         self.emit("error", 'ERROR ON LOAD FILE COMMAND');
-      } 
+      }
   })
   .on('error',function (error){
       if(error.code == "ECONNRESET") {
@@ -600,8 +632,8 @@ dahua.prototype.saveFile = function (file,filename) {
 ====================================*/
 
 // API Description
-// 
-// URL Syntax 
+//
+// URL Syntax
 // http://<ip>/cgi-bin/snapshot.cgi? [channel=<channelNo>]
 
 // Response
@@ -632,7 +664,7 @@ dahua.prototype.getSnapshot = function (options) {
   request(BASEURI + '/cgi-bin/snapshot.cgi?' + options.channel , function (error, response, body) {
     if ((error) || (response.statusCode !== 200)) {
       self.emit("error", 'ERROR ON SNAPSHOT');
-    } 
+    }
   })
   .on('end',function(){
     if(TRACE) console.log('SNAPSHOT SAVED');
@@ -652,7 +684,7 @@ dahua.prototype.generateFilename = function( device, channel, start, end, filety
 
   // to be done: LOCALIZATION ?
   startDate = moment(start);
-  
+
   filename += startDate.format('YYYYMMDDhhmmss');
   if(end) {
     endDate = moment(end);
@@ -660,7 +692,7 @@ dahua.prototype.generateFilename = function( device, channel, start, end, filety
   }
   filename += '.' + filetype;
 
-  return filename; 
+  return filename;
 
 };
 
