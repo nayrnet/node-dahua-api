@@ -46,27 +46,7 @@ dahua.prototype.connect = function(options) {
     var self = this;
 
     var eventNames = [
-        'VideoMotion',
-        'VideoLoss',
-        'VideoBlind',
-        'AlarmLocal',
-        'CrossLineDetection',
-        'CrossRegionDetection',
-        'LeftDetection',
-        'TakenAwayDetection',
-        'VideoAbnormalDetection',
-        'FaceDetection',
-        'AudioMutation',
-        'AudioAnomaly',
-        'VideoUnFocus',
-        'WanderDetection',
-        'RioterDetection',
-        'ParkingDetection',
-        'MoveDetection',
-        'MDResult',
-        'HeatImagingTemper',
-        'SmartMotionHuman',
-        'SmartMotionVehicle'
+        'All'
     ];
 
     var opts = {
@@ -120,28 +100,32 @@ function handleDahuaEventData(self, data) {
   i.forEach(function(id){
     if (data[id].startsWith('Code=')) {
       var alarm = data[id].split(';');
-      var code = alarm[0].substr(5);
-      var action = alarm[1].substr(7);
-      var index = alarm[2].substr(6);
+      if (alarm.length >= 3) {
+        var code = alarm[0].substr(5);
+        var action = alarm[1].substr(7);
+        var index = alarm[2].substr(6);
 
-    // an alarm can have also a data object
-    // which is multiline in the body
-    var metadata = {};
-    if (alarm[3].startsWith('data={')) {
-        var metadataArray = alarm[3].split('\n');
-        metadataArray[0] = '{'; // we don't want "data={"
+      // an alarm can have also a data object
+      // which is multiline in the body
+      var metadata = {};
 
-        var metadata = metadataArray.join('');
-        try {
-            metadata = JSON.parse(metadata);
-            if (TRACE) console.dir(metadata, 'Got JSON parsed metadata');
-        }
-        catch (e) {
-            console.error(e, 'Error during JSON.parse of alarm extra data');
-        }
-    }
+      if (alarm.length >= 4 && alarm[3].startsWith('data={')) {
+          var metadataArray = alarm[3].split('\n');
+          metadataArray[0] = '{'; // we don't want "data={"
 
-      self.emit("alarm", code,action,index, metadata);
+          var metadata = metadataArray.join('');
+          try {
+              metadata = JSON.parse(metadata);
+              if (TRACE) console.dir(metadata, 'Got JSON parsed metadata');
+          }
+          catch (e) {
+              self.emit("error", "Error during JSON.parse of alarm extra data");
+              console.error(e, 'Error during JSON.parse of alarm extra data');
+          }
+      }
+
+        self.emit("alarm", code,action,index, metadata);
+      }
     }
   });
 }
