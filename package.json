@@ -10,7 +10,9 @@
     "request": "^2.85.0",
     "request-progress": "^3.0.0"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "eslint": "^8.12.0"
+  },
   "scripts": {
     "test": "echo 0"
   },

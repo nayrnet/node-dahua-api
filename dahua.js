@@ -14,6 +14,9 @@ var moment = require('moment');
 
 var TRACE   = true;
 var BASEURI   = false;
+var USER;
+var HOST;
+var PASS;
 
 var dahua = function(options) {
 
@@ -30,7 +33,7 @@ var dahua = function(options) {
     options.cameraAlarms = true;
   }
 
-  if( options.cameraAlarms ) { this.client = this.connect(options) };
+  if( options.cameraAlarms ) { this.client = this.connect(options) }
 
   this.on('error',function(err){
     console.log("Error: " + err);
@@ -113,7 +116,7 @@ function handleDahuaEventData(self, data) {
           var metadataArray = alarm[3].split('\n');
           metadataArray[0] = '{'; // we don't want "data={"
 
-          var metadata = metadataArray.join('');
+          metadata = metadataArray.join('');
           try {
               metadata = JSON.parse(metadata);
               if (TRACE) console.dir(metadata, 'Got JSON parsed metadata');
