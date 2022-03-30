@@ -11,6 +11,7 @@ var setKeypath = require('keypather/set');
 var fs = require('fs');
 var path = require('path');
 var moment = require('moment');
+var RECONNECT_TIMEOUT_SECONDS = 10;
 var dahua = function(options) {
 
   events.EventEmitter.call(this);
@@ -72,8 +73,8 @@ dahua.prototype.connect = function(options) {
 
     client.on('error', function(err) {
       if (!connected) {
-        console.error("Connection closed- reconnecting in 30 seconds...");
-        setTimeout(function() { self.connect(options); }, 30000 );
+        console.error("Connection closed- reconnecting in " + RECONNECT_TIMEOUT_SECONDS + " seconds...");
+        setTimeout(function() { self.connect(options); }, RECONNECT_TIMEOUT_SECONDS * 1000 );
       }
       handleDahuaEventError(self, err);
     });
@@ -83,9 +84,9 @@ dahua.prototype.connect = function(options) {
     });
 
     client.on('close', function() {   // Try to reconnect after 30s
-      var connected = false;
-      console.error("Connection closed- reconnecting in 30 seconds...");
-      setTimeout(function() { self.connect(options); }, 30000 );
+      connected = false;
+      console.error("Connection closed- reconnecting in " + RECONNECT_TIMEOUT_SECONDS + " seconds...");
+      setTimeout(function() { self.connect(options); }, RECONNECT_TIMEOUT_SECONDS * 1000 );
       handleDahuaEventEnd(self);
     });
 
