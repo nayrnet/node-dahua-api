@@ -40,7 +40,7 @@ util.inherits(dahua, events.EventEmitter);
 dahua.prototype.connect = function(options) {
 
     var self = this;
-
+    var connected = false;
     var eventNames = [
         'All'
     ];
@@ -66,10 +66,15 @@ dahua.prototype.connect = function(options) {
     });
 
     client.on('response', function() {
+      connected = true;
       handleDahuaEventConnection(self,options);
     });
 
     client.on('error', function(err) {
+      if (!connected) {
+        console.error("Connection closed- reconnecting in 30 seconds...");
+        setTimeout(function() { self.connect(options); }, 30000 );
+      }
       handleDahuaEventError(self, err);
     });
 
@@ -78,6 +83,7 @@ dahua.prototype.connect = function(options) {
     });
 
     client.on('close', function() {   // Try to reconnect after 30s
+      var connected = false;
       console.error("Connection closed- reconnecting in 30 seconds...");
       setTimeout(function() { self.connect(options); }, 30000 );
       handleDahuaEventEnd(self);
