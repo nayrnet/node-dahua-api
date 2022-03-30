@@ -129,7 +129,7 @@ function handleDahuaEventData(self, data) {
 function handleDahuaEventConnection(self,options) {
   if (self.TRACE)  console.log('Connected to ' + options.host + ':' + options.port);
   //self.socket = socket;
-  self.emit("connect");
+  self.emit("connect", options);
 }
 
 function handleDahuaEventEnd(self) {
@@ -638,9 +638,7 @@ dahua.prototype.saveFile = function (file,filename) {
 dahua.prototype.getSnapshot = function (options) {
   var self = this;
 
-  if(options === undefined) {
-    var options = {};
-  }
+  options = options || {};
 
   if ((!options.channel)) {
     options.channel = 0;
